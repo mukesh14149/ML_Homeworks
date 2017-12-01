@@ -1,0 +1,76 @@
+import os
+import os.path
+import argparse
+import h5py
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.svm import SVC
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_name", type = str  )
+parser.add_argument("--weights_path", type = str)
+parser.add_argument("--data", type = str  )
+parser.add_argument("--plots_save_dir", type = str  )
+
+args = parser.parse_args()
+
+
+# Load the test data
+def load_h5py(filename):
+	with h5py.File(filename, 'r') as hf:
+		X = hf['x'][:]
+		Y = hf['y'][:]
+	return X, Y
+
+def int_kernel(x1,x2):
+	sigma=0.5
+	f = np.exp((-1*np.square(np.linalg.norm(x1-x2)))/(2*np.square(sigma)))
+	return f
+
+#kernel must take as arguments 
+#two matrices of shape (n_samples_1, n_features)
+#(n_samples_2, n_features) and return a 
+#kernel matrix of shape (n_samples_1, n_samples_2).
+def gaussian_kernel(X1, X2, K=int_kernel):
+    grammat = np.zeros((X1.shape[0], X2.shape[0]))
+    for i, x1 in enumerate(X1):
+        for j, x2 in enumerate(X2):
+            grammat[i,j] = K(x1,x2)
+    return grammat
+
+X,Y = load_h5py('./../../'+args.data)
+data_size = int(0.8*len(X)) 
+clf = SVC(kernel=gaussian_kernel,C=0.7)
+clf.fit(X[0:data_size],Y[0:data_size])
+
+# models = (SVC(kernel='linear', C=1),
+#           SVC(kernel=gaussian_kernel, C=1)
+#           SVC(kernel='poly'))
+          
+models = (clf.fit(X, Y) for clf in models)
+
+models = (SVC(kernel='linear', C=1),
+          SVC(kernel=gaussian_kernel, C=1))
+models = (clf.fit(X, Y) for clf in models)
+
+# title for the plots
+titles = ('SVC with linear kernel',
+          'SVC with RBF kernel')
+X0, X1 = X[:, 0], X[:, 1]
+h=0.02
+x_min, x_max = X0.min() - 1, X0.max() + 1
+y_min, y_max = X1.min() - 1, X1.max() + 1
+xx, yy = np.meshgrid(np.arange(x_min, x_max, h),np.arange(y_min, y_max, h))
+
+fig, sub = plt.subplots(1, 2)
+plt.subplots_adjust(wspace=0.5, hspace=0.5)
+
+for clf, title, ax in zip(models, titles, sub.flatten()):
+    Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    out = ax.contourf(xx, yy, Z, cmap=plt.cm.Spectral, alpha=0.8)
+    ax.scatter(X0, X1, c=Y, cmap=plt.cm.coolwarm, s=20, edgecolors='k')
+    ax.set_xlabel('Feature1')
+    ax.set_ylabel('Feature2')
+    ax.set_title(title)
+plt.show()

@@ -1,0 +1,95 @@
+import os
+import os.path
+import argparse
+import h5py
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.svm import SVC
+from scipy.stats import multivariate_normal
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_name", type = str  )
+parser.add_argument("--weights_path", type = str)
+parser.add_argument("--data", type = str  )
+parser.add_argument("--plots_save_dir", type = str  )
+
+args = parser.parse_args()
+
+
+# Load the test data
+def load_h5py(filename):
+	with h5py.File(filename, 'r') as hf:
+		X = hf['x'][:]
+		Y = hf['y'][:]
+	return X, Y
+
+# Load the test data
+def write_h5py(filename,X,Y):
+	with h5py.File("clean"+filename, 'w') as hf:
+		hf.create_dataset('x', data=X, compression="gzip", compression_opts=9)
+		hf.create_dataset('y', data=Y, compression="gzip", compression_opts=9)
+
+X,Y = load_h5py('./../../'+args.data)
+
+   	
+def drop_outliers(x1,x2,mean_1,mean_2,std_1,std_2):
+	#print x1-mean_1,x2-mean_2,std_1,std_2
+	if abs(x1-mean_1) >= std_1 and abs(x2-mean_2)>=std_2: 
+		return 10,10
+	return x1,x2
+print np.shape(X)
+
+datasetX=[]
+datasetY=[]
+nc=2
+if args.data == "data_3.h5":
+	nc=3
+for h in range(0,nc):	
+	t=0
+	tempX=[]
+	tempY=[]
+	for i,j in X:
+		if Y[t]==h:
+			tempX.append([i,j])
+			tempY.append(Y[t])
+		t=t+1
+
+	tempX = np.array(tempX)	
+	#print np.shape(tempX)
+	mean_1  = np.mean(tempX[:,0])
+	mean_2  = np.mean(tempX[:,1])
+	#std_1 = np.std(tempX[:,0])
+	#std_2 = np.std(tempX[:,1])
+	covd=np.cov(np.vstack((tempX[:,0],tempX[:,1])))
+	meand=[mean_1,mean_2]
+	y = multivariate_normal.pdf(tempX, meand, covd); 
+	print len(y)
+	for i in range(0,len(y)):
+		if y[i]>=0.1:
+			datasetX.append(tempX[i,:])
+			datasetY.append(tempY[i])
+
+	print np.shape(datasetX)
+		
+# 	print mean_1,mean_2,std_1,std_2
+# 	t=0
+# 	for i,j in tempX:
+# 		x1,y1=drop_outliers(i,j,mean_1,mean_2,std_1,std_2)
+# 		if x1!=10 and y1!=10:
+# 			datasetX.append([x1,y1])
+# 			datasetY.append(tempY[t])
+# 		t=t+1
+# 	#print np.shape(datasetX)
+# 	t=0
+
+
+datasetX = np.array(datasetX)
+#write_h5py('./../../'+args.data,datasetX,datasetY)
+print np.shape(datasetX)
+color=["#000000","#FF0000","#FFF000"]
+plt.scatter(datasetX[:, 0], datasetX[:, 1], color=[color[i] for i in datasetY])
+plt.show()
+plt.close()
+
+
+

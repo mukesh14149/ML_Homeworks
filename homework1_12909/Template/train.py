@@ -1,0 +1,255 @@
+import os
+import os.path
+import argparse
+import h5py
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.externals import joblib
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_name", type = str  )
+parser.add_argument("--weights_path", type = str)
+parser.add_argument("--train_data", type = str  )
+parser.add_argument("--plots_save_dir", type = str  )
+
+args = parser.parse_args()
+
+
+# Load the test data
+def load_h5py(filename):
+	with h5py.File(filename, 'r') as hf:
+		X = hf['X'][:]
+		Y = hf['Y'][:]
+	return X, Y
+
+# Preprocess data and split it
+print args.model_name
+# Train the models
+X,Y = load_h5py(args.train_data)
+Y_R = []
+for i in range(0,len(Y)):
+	Y_R.append(Y[i].tolist().index(1.0))
+
+if args.model_name == 'GaussianNB':	
+	data_size = int(0.7*len(X)) 
+	#print int(0.3*len(X))
+	#############Modal for dataset division ratio 70:30
+	clf = GaussianNB()
+ 	clf.fit(X[0:data_size], Y_R[0:data_size])
+	predictarr = clf.predict(X[data_size:len(X)])
+	count = 0;
+	t = 0;
+	for i in range(data_size,len(X)):
+		if(Y_R[i] == predictarr[t]):
+			count=count+1
+		t = t+1
+	
+	print (count/(0.3*len(X)))*100
+	clf1 = GaussianNB()	
+	data_size = int(1*len(X))
+	clf1 = clf1.fit(X[0:data_size], Y_R[0:data_size])	
+	joblib.dump(clf1, args.weights_path+"/GaussianNB.pkl") 	
+	# #############Grid Search and K-Fold implementation 
+	# k =10
+	# start = 0	
+	# end=len(Y_R)/k
+	# avg=0
+	# for j in range(0,k):
+	# 	#print start, end
+	# 	clf = GaussianNB()
+	# 	train =[]
+	# 	test = X[start:end]
+	# 	test_label = Y_R[start:end]
+		
+	# 	train = (X[0:start])
+	# 	#print len(train)
+	# 	train_label = (Y_R[0:start])
+	# 	train = np.concatenate((train, X[end+1:4200]),axis=0)
+	# 	#print end, len(train),len(X[end+1:4200])
+	# 	train_label = np.concatenate((train_label,Y_R[end+1:4200]),axis=0)
+		
+	# 	#print len(train),len(train_label),len(test),len(test_label)
+			
+	# 	clf.fit(train,train_label)
+	# 	predictarr = clf.predict(test)
+	# 	count = 0;
+	# 	t = 0;
+	# 	for i in range(start,end):
+	# 		#print i
+	# 		if(test_label[t] == predictarr[t]):
+	# 			count=count+1
+	# 		t = t+1
+
+	# 	avg =avg +(count/(0.3*len(X)))*100
+	# 	start = end
+	# 	end = end + len(Y_R)/k
+	# print avg/k
+	pass
+elif args.model_name == 'LogisticRegression':
+	learning = 0.001
+	perfect_C = 0
+	maximum_acc = 0
+	arr1 = []
+	arr2 = []
+	for learning in [0.001,0.008,0.01,0.05,0.1,0.5,1,10,100,1000,10000]:
+ 		data_size = int(0.7*len(X)) 
+		print int(0.3*len(X))
+		clf = LogisticRegression(C=learning)	 	
+		clf.fit(X[0:data_size], Y_R[0:data_size])
+		predictarr = clf.predict(X[data_size:len(X)])
+		count = 0;
+		t = 0;
+		for i in range(data_size,len(X)):
+			if(Y_R[i] == predictarr[t]):
+				count=count+1
+			t = t+1
+	
+		print (count/(0.3*len(X)))*100
+		k = 10
+		start = 0	
+		end=len(Y_R)/k
+		avg=0
+		for j in range(0,k):
+			#print start, end
+			clf =  LogisticRegression(penalty='l1',dual=False,C=learning,tol=0.1)	 	
+			test = X[start:end]
+			test_label = Y_R[start:end]
+		
+			train = (X[0:start])
+			#print len(train)
+			train_label = (Y_R[0:start])
+			
+			train = np.concatenate((train, X[end+1:4200]),axis=0)
+			#print end, len(train),len(X[end+1:4200])
+			train_label = np.concatenate((train_label,Y_R[end+1:4200]),axis=0)
+		
+			#print len(train),len(train_label),len(test),len(test_label)
+			
+			clf.fit(train,train_label)
+			predictarr = clf.predict(test)
+			count = 0;
+			t = 0;
+			for i in range(start,end):
+				#print i
+				if(test_label[t] == predictarr[t]):
+					count=count+1
+				t = t+1
+
+			avg =avg +(float(count)/(len(Y_R)/k))*100
+			start = end
+			end = end + len(Y_R)/k
+		result= avg/k
+		print result
+		if(result>maximum_acc):
+			maximum_acc=result
+			perfect_C = learning
+		arr2.append(avg/k)
+		arr1.append(learning)
+		pass
+	data_size = int(1*len(X))
+	clf = LogisticRegression(penalty='l1',dual=False,C=perfect_C,tol=0.1)
+	clf = clf.fit(X[0:data_size], Y_R[0:data_size])	
+	
+	print clf
+	joblib.dump(clf, args.weights_path+"/LogisticRegression.pkl") 	
+	plt.plot(arr1, arr2)
+	plt.ylabel('Accuracy in %')
+	plt.xlabel('Value of C')
+	plt.savefig(args.plots_save_dir+"LogisticRegression.png")	
+	pass
+elif args.model_name == 'DecisionTreeClassifier':
+	max = 0	
+	# clf = DecisionTreeClassifier()
+	# clf.fit(X[0:2940], Y_R[0:2940])
+	# predictarr = clf.predict(X[2941:4200])
+	# count = 0;
+	# t = 0;
+	# for i in range(2941,4200):
+	# 	if(Y_R[i] == predictarr[t]):
+	# 		count=count+1
+	# 	t = t+1
+	# arr ={}	
+	arr1 = []
+	arr2=[]
+	maximum_acc = 0
+	perfect_max_leaf_nodes = 2
+	#print (float(count)/(4200-3000))*100
+	for max_leaf_nodes in range(2,120):
+		data_size = int(0.7*len(X)) 
+		print max_leaf_nodes
+		clf = DecisionTreeClassifier(max_leaf_nodes = max_leaf_nodes)
+ 		clf.fit(X[0:data_size], Y_R[0:data_size])
+		predictarr = clf.predict(X[data_size:len(X)])
+		count = 0;
+		t = 0;
+		for i in range(data_size,len(X)):
+			if(Y_R[i] == predictarr[t]):
+				count=count+1
+			t = t+1
+	
+		print (float(count)/(0.3*len(X)))*100
+		k =4
+		start = 0	
+		end=len(Y_R)/k
+		avg=0
+		for j in range(0,k):
+			#print start, end
+			clf = DecisionTreeClassifier(max_leaf_nodes = max_leaf_nodes)
+			train =[]
+			test = X[start:end]
+			test_label = Y_R[start:end]
+			train = (X[0:start])
+			#print len(train)
+			train_label = (Y_R[0:start])
+			train = np.concatenate((train, X[end+1:4200]),axis=0)
+			#print end, len(train),len(X[end+1:4200])
+			train_label = np.concatenate((train_label,Y_R[end+1:4200]),axis=0)
+		
+			#print len(train),len(train_label),len(test),len(test_label)
+			
+			clf.fit(train,train_label)
+			predictarr = clf.predict(test)
+			count = 0;
+			t = 0;
+			for i in range(start,end):
+				#print i
+				if(test_label[t] == predictarr[t]):
+					count=count+1
+				t = t+1
+
+			avg =avg +(float(count)/(len(Y_R)/k))*100
+			start = end
+			end = end + len(Y_R)/k
+		result = avg/k
+		if(result>maximum_acc):
+			maximum_acc=result
+			perfect_max_leaf_nodes = max_leaf_nodes
+		arr2.append(avg/k)
+		arr1.append(max_leaf_nodes)
+		pass
+	#print arr	
+	clf = DecisionTreeClassifier(max_leaf_nodes = max_leaf_nodes)	
+	data_size = int(1*len(X))
+	clf = clf.fit(X[0:data_size], Y_R[0:data_size])
+	joblib.dump(clf, args.weights_path+"/DecisionTreeClassifier.pkl") 	
+	plt.plot(arr1, arr2)
+	plt.ylabel('Accuracy in %')
+	plt.xlabel('Value of max_leaf_nodes')
+	plt.savefig(args.plots_save_dir+"DecisionTreeClassifier.png")	
+
+	# define the grid here
+
+	# do the grid search with k fold cross validation
+
+
+
+
+	# model = DecisionTreeClassifier(  ...  )
+
+	# save the best model and print the results
+else:
+	raise Exception("Invald Model name")

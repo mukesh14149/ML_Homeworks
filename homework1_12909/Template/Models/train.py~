@@ -1,0 +1,18 @@
+import numpy as np
+
+# Load the test data
+def load_h5py(filename):
+	with h5py.File(filename, 'r') as hf:
+		X = hf['X'][:]
+		Y = hf['Y'][:]
+	return X, Y
+
+# Preprocess data and split it
+print args.model_name
+# Train the models
+X,Y = load_h5py('Data/part_A_train.h5')
+Y_R = []
+
+for i in range(0,len(Y)):
+	Y_R.append(Y[i].tolist().index(1.0))
+
